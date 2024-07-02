@@ -2,8 +2,12 @@
   "$schema": "https://json.schemastore.org/swcrc",
   "jsc": {
     "parser": {
-      "syntax": "typescript"
+      "syntax": "typescript",
+			"tsx": false
     },
     "target": "es5"
-  }
+  },
+	"module": {
+		"type": "commonjs"
+	}
 }

@@ -1,26 +1,27 @@
 {
-  "name": "naver-login-webdriver",
+  "name": "naver-login-lambda",
   "version": "1.0.0",
-  "description": "",
-	"type": "module",
+  "description": "네이버 NID_SES를 가져오는 AWS Lambda 함수입니다.",
+  "type": "commonjs",
   "main": "dist/index.js",
   "scripts": {
-    "build": "npx tsc",
-    "start": "node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npx swc src -d dist --strip-leading-paths",
+    "start": "node dist/index.js"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@swc/cli": "^0.3.14",
     "@swc/core": "^1.6.5",
+    "@types/aws-lambda": "^8.10.140",
     "@types/chrome-remote-interface": "^0.31.14",
     "@types/selenium-webdriver": "^4.1.23",
     "typescript": "^5.5.2"
   },
   "dependencies": {
-    "chrome-launcher": "^1.1.2",
-    "chrome-remote-interface": "^0.33.0",
-    "selenium-webdriver": "^4.22.0"
+    "dotenv": "^16.4.5",
+    "puppeteer": "^22.12.1",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
   }
 }

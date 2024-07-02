@@ -1,66 +1,68 @@
-import { Builder, Browser, By } from "selenium-webdriver";
-import chrome from "selenium-webdriver/chrome.js";
-import * as chromeLauncher from "chrome-launcher";
-import CDP from "chrome-remote-interface";
+import { Handler } from "aws-lambda";
+
 import path from "path";
-import { fileURLToPath } from "url";
+import puppeteer from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import dotenv from "dotenv";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const chromeServiceBuilder = new chrome.ServiceBuilder(path.resolve(__dirname, "..", "drivers", "chromedriver"));
+// 환경 설정 가져오기
+dotenv.config({ path: path.resolve(__dirname, "..", ".env" )})
 
-export const run = async () => {
-	// Chrome을 수동으로 시작
-	const launcher = await chromeLauncher.launch({
-		chromeFlags: ["--disable-blink-features=AutomationControlled"]
+puppeteer.use(StealthPlugin()); // 플러그인 추가
+
+const nidParser = async () => {
+	let NID_SES = null;
+	const browser = await puppeteer.launch({
+		headless: false,
+		args: [
+			'--no-sandbox',
+			'--disable-setuid-sandbox',
+			'--disable-dev-shm-usage',
+			'--disable-accelerated-2d-canvas',
+			'--disable-gpu',
+			'--disable-infobars',
+			'--window-size=1920x1080',
+		],
 	});
 
-	// Chrome DevTools 프로토콜에 연결
-	const client = await CDP({ port: launcher.port });
-
-	// DevTools 세션을 통해 속성 변경
-	const { Network, Page, Runtime } = client;
-	await Promise.all([Network.enable(), Page.enable()]);
-
-	await Runtime.evaluate({
-		expression: `
-				Object.defineProperty(navigator, 'webdriver', {
-						get: () => undefined
-				});
-				Object.defineProperty(navigator, 'languages', {
-						get: () => ['en-US', 'en']
-				});
-				Object.defineProperty(navigator, 'plugins', {
-						get: () => [1, 2, 3, 4, 5]
-				});
-		`
-	});
-
-	const options = new chrome.Options();
-	options.addArguments(`--remote-debugging-port=${launcher.port}`);
-
-	let driver = await new Builder()
-		.forBrowser(Browser.CHROME)
-		.setChromeOptions(options)
-		.setChromeService(chromeServiceBuilder)
-		.build();
+	const page = await browser.newPage();
+	await page.setViewport({ width: 1200, height: 800 });
 
 	try {
-		await driver.get("https://nid.naver.com/nidlogin.login");
-		await driver.getSession();
-		// 로그인정보 입력 후, 로그인 버튼 클릭
-		await driver.findElement(By.id("id")).click();
-		await driver.findElement(By.id("id")).sendKeys(process.env.USERNAME);
+		await page.goto("https://nid.naver.com/nidlogin.login?url=https%3A%2F%2Fchzzk.naver.com%2F");
 
-		await driver.findElement(By.id("pw")).click();
-		await driver.findElement(By.id("pw")).sendKeys(process.env.PASSWORD);
-		await driver.findElement(By.id('keep')).click();
-		await driver.findElement(By.id('log.login')).click();
-		// const cookies = await driver.manage().getCookies();
-		// console.log(cookies);
+		await page.type("input#id", process.env.NID_ID, {delay: 100});
+		await page.type("input#pw", process.env.NID_PW, {delay: 100});
+		await page.keyboard.press("Enter", { delay: 100 });
+	
+		await page.waitForNavigation();
+		const cookies = await page.cookies();
+
+		let NID_SES = null;
+		for (const cookie of cookies) {
+			if (cookie.name === "NID_SES") {
+				NID_SES = cookie.value;
+				break;
+			}
+		}
+
+		if (NID_SES) {
+			console.log("Found NID_SES: %s", NID_SES);
+		} else {
+			console.error("NID_SES not found.");
+		}
 	} finally {
-		await driver.quit();
-		await client.close();
-		await launcher.kill();
+		await page.close();
+		await browser.close();	
 	}
+
+	return NID_SES;
 };
-run();
+
+export const handler: Handler = async (event, context) => {
+	const nidSession = await nidParser();
+
+	return {
+		nidSession
+	};
+};

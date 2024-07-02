@@ -1,6 +1,6 @@
 declare var process: {
 	env: {
-		USERNAME: string;
-		PASSWORD: string;
+		NID_ID: string;
+		NID_PW: string;
 	}
 }

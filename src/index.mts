@@ -1,10 +1,9 @@
-import { PerformanceObserver, performance } from "perf_hooks";
-
 import { Handler } from "aws-lambda";
 
 // https://github.com/Sparticuz/chromium/releases 에서 배포중인 layer 를 직접 계층에 등록후 사용바람
 // v122 아래버전으로 적용
 import chromium from "@sparticuz/chromium";
+import util from "util";
 
 import { chromium as playwright } from "playwright";
 import type { Browser } from "playwright";
@@ -12,7 +11,7 @@ import type { Browser } from "playwright";
 chromium.setGraphicsMode = false;
 chromium.setHeadlessMode = true;
 
-const nidParser = async () => {
+const nidCookieParser = async () => {
 	// 개발 환경에서 설정 가져오기
 	if (process.env.NODE_ENV === "development") {
 		const dotenv = await import("dotenv");
@@ -61,21 +60,15 @@ const nidParser = async () => {
 
 		await page.waitForURL("https://chzzk.naver.com/");
 		const cookies = await context.cookies();
+		const arr: string[] = [];
 		for (const cookie of cookies) {
-			if (cookie.name === "NID_SES") {
-				NID_SES = cookie.value;
-				break;
-			}
+			arr.push(`${cookie.name}=${cookie.value}`);
 		}
+		NID_SES = arr.join(";");
 
-		if (NID_SES) {
-			console.log("Found NID_SES: %s", NID_SES);
-		} else {
-			console.error("NID_SES not found.");
-		}
+		console.log("Found Cookie: %s", NID_SES);
 	} finally {
 		if (browser !== null) {
-			await 
 			await browser.close();
 		}
 	}
@@ -83,10 +76,7 @@ const nidParser = async () => {
 	return NID_SES;
 };
 
-export const handler: Handler = async (event, context) => {
-	const nidSession = await nidParser();
-
-	return {
-		nidSession
-	};
+export const handler: Handler = async (event, context, callback) => {
+	console.info(util.inspect(event, {depth: null}));
+	callback(null, await nidCookieParser());
 };

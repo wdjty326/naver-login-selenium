@@ -1,7 +1,7 @@
 {
   "name": "naver-login-lambda",
   "version": "1.0.0",
-  "description": "네이버 NID_SES를 가져오는 AWS Lambda 함수입니다.",
+  "description": "네이버 로그인쿠키를 가져오는 AWS Lambda 함수입니다.",
   "type": "module",
   "main": "dist/index.mjs",
   "scripts": {
@@ -14,6 +14,7 @@
   "devDependencies": {
     "@types/aws-lambda": "^8.10.140",
     "@types/node": "^20.14.9",
+    "aws-sdk": "^2.1655.0",
     "dotenv": "^16.4.5",
     "typescript": "^5.5.2"
   },

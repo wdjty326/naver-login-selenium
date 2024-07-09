@@ -7,12 +7,12 @@ import util from "util";
 
 import { chromium as playwright } from "playwright";
 import type { Browser } from "playwright";
-import aws from "aws-sdk";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 chromium.setGraphicsMode = false;
 chromium.setHeadlessMode = true;
 
-const s3 = new aws.S3({ region: "ap-northeast-2" });
+const s3 = new S3Client({ region: "ap-northeast-2" });
 
 const nidCookieParser = async () => {
 	// 개발 환경에서 설정 가져오기
@@ -74,11 +74,12 @@ const nidCookieParser = async () => {
 
 		// 테스트시에는 s3에 키를 올리지 않음
 		if (process.env.NODE_ENV !== "development") {
-			await s3.upload({
+			const command = new PutObjectCommand({
 				Bucket: process.env.S3_BUCKET as string,
 				Key: process.env.S3_KEYNAME as string,
 				Body: NID_SES,
-			}).promise();	
+			});
+			await s3.send(command);	
 		}
 	} finally {
 		if (browser !== null) {

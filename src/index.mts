@@ -7,9 +7,12 @@ import util from "util";
 
 import { chromium as playwright } from "playwright";
 import type { Browser } from "playwright";
+import aws from "aws-sdk";
 
 chromium.setGraphicsMode = false;
 chromium.setHeadlessMode = true;
+
+const s3 = new aws.S3({ region: "ap-northeast-2" });
 
 const nidCookieParser = async () => {
 	// 개발 환경에서 설정 가져오기
@@ -39,7 +42,7 @@ const nidCookieParser = async () => {
 		console.log("page...");
 		await page.goto("https://nid.naver.com/nidlogin.login?url=https%3A%2F%2Fchzzk.naver.com%2F");
 
-		let nidID = page.getByLabel("아이디");		
+		let nidID = page.getByLabel("아이디");
 		if (!await nidID.isVisible()) nidID = page.getByLabel("ID");
 		console.log("@visible ID");
 
@@ -58,15 +61,25 @@ const nidCookieParser = async () => {
 		await page.keyboard.press("Enter");
 		console.log("@login");
 
-		await page.waitForURL("https://chzzk.naver.com/");
+		await page.waitForURL("https://chzzk.naver.com/", { timeout: 5000 });
 		const cookies = await context.cookies();
 		const arr: string[] = [];
 		for (const cookie of cookies) {
 			arr.push(`${cookie.name}=${cookie.value}`);
 		}
 		NID_SES = arr.join(";");
+		if (NID_SES) {
+			console.log("Found Cookie: %s", NID_SES);
+		}
 
-		console.log("Found Cookie: %s", NID_SES);
+		// 테스트시에는 s3에 키를 올리지 않음
+		if (process.env.NODE_ENV !== "development") {
+			await s3.upload({
+				Bucket: process.env.S3_BUCKET as string,
+				Key: process.env.S3_KEYNAME as string,
+				Body: NID_SES,
+			}).promise();	
+		}
 	} finally {
 		if (browser !== null) {
 			await browser.close();
@@ -77,6 +90,6 @@ const nidCookieParser = async () => {
 };
 
 export const handler: Handler = async (event, context, callback) => {
-	console.info(util.inspect(event, {depth: null}));
+	console.info(util.inspect(event, { depth: null }));
 	callback(null, await nidCookieParser());
 };

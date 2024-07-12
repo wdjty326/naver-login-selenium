@@ -7,12 +7,51 @@ import util from "util";
 
 import { chromium as playwright } from "playwright";
 import type { Browser } from "playwright";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getObject, putObject } from "./command.mjs";
 
 chromium.setGraphicsMode = false;
 chromium.setHeadlessMode = true;
 
-const s3 = new S3Client({ region: "ap-northeast-2" });
+/**
+ * 사용할 계정정보를 가져옵니다.
+ */
+const nidAccount = async () => {
+	if (!process.env.NID_ID || !process.env.NID_PW) return null;
+
+	const nidIds = process.env.NID_ID.split(",");
+	const nidPws = process.env.NID_PW.split(",");
+
+	let nidId = nidIds[0];
+	let nidPw = nidPws[0];
+
+	try {
+		const filterList: string[] = [];
+		const data = await getObject(process.env.S3_ACC_KEYNAME as string);
+		filterList.push(...data.split(","));
+
+		if (filterList.length === nidIds.length) {
+			filterList.length = 0;
+		}
+
+		for (const filterId of filterList) {
+			const index = nidIds.indexOf(filterId);
+			if (index !== -1) {
+				nidIds.splice(index, 1);
+				nidPws.splice(index, 1);
+			}
+		}
+
+		nidId = nidIds[0];
+		nidPw = nidPws[0];
+
+		filterList.push(nidId);
+		await putObject(process.env.S3_ACC_KEYNAME as string, filterList.join(","));
+	} catch (e) {
+		console.log(e);
+	}
+
+	return [nidId, nidPw];
+};
 
 const nidCookieParser = async () => {
 	// 개발 환경에서 설정 가져오기
@@ -24,9 +63,10 @@ const nidCookieParser = async () => {
 	let browser: Browser | null = null;
 	let NID_SES: string = "";
 
-	if (!process.env.NID_ID || !process.env.NID_PW) return NID_SES;
-
 	try {
+		const account = await nidAccount();
+		if (!account) return;
+
 		const executablePath = await chromium.executablePath();
 		browser = await playwright.launch(process.env.NODE_ENV === "development" ?
 			undefined :
@@ -52,10 +92,10 @@ const nidCookieParser = async () => {
 
 		if (!await nidID.isVisible() || !await nidID.isVisible()) return NID_SES;
 
-		await nidID.fill(process.env.NID_ID);
+		await nidID.fill(account[0]);
 		page.waitForTimeout(200);
 
-		await nidPW.fill(process.env.NID_PW);
+		await nidPW.fill(account[1]);
 		page.waitForTimeout(100);
 
 		await page.keyboard.press("Enter");
@@ -72,15 +112,7 @@ const nidCookieParser = async () => {
 			console.log("Found Cookie: %s", NID_SES);
 		}
 
-		// 테스트시에는 s3에 키를 올리지 않음
-		if (process.env.NODE_ENV !== "development") {
-			const command = new PutObjectCommand({
-				Bucket: process.env.S3_BUCKET as string,
-				Key: process.env.S3_KEYNAME as string,
-				Body: NID_SES,
-			});
-			await s3.send(command);	
-		}
+		putObject(process.env.S3_KEYNAME as string, NID_SES);
 	} finally {
 		if (browser !== null) {
 			await browser.close();

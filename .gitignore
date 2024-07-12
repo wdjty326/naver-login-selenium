@@ -8,3 +8,6 @@ dist
 .env
 
 yarn-error.log
+
+# 로컬 테스트용
+__test__

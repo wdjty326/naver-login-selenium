@@ -1,2 +1,2 @@
 import { handler } from "./dist/index.mjs";
-handler();
+handler(null, null, console.log);
